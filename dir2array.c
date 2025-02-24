@@ -12,9 +12,15 @@
 typedef struct dir_array_
 {
     struct dirent* dir;
-    struct dir_array_* next_file;
+    struct list_index_* next_file;
     struct dir_array_* next_entrie;
 } dir_array;
+
+typedef struct list_index_
+{
+    char** path;
+    dir_array* next_entrie;
+} list_index;
 
 
 dir_array* add_to_list(dir_array* prev, struct dirent* dir)
@@ -34,29 +40,30 @@ dir_array* add_to_list(dir_array* prev, struct dirent* dir)
 }
 
 
-void print_list(dir_array* input, char* prefix)
+void print_list(list_index* input, char* prefix)
 {
-    dir_array* current = input;
+    dir_array* current = input->next_entrie;
 
     while(current != NULL)
     {
         printf("%s%s", prefix, current->dir->d_name);
         if (current->dir->d_type == DT_DIR)
         {
-            printf("/");
-        }
-        printf("\n");
+            printf("/\n");
 
-        if (current->dir->d_type == DT_DIR)
-        {
-            print_list(current->next_file, "---->");
+            list_index* next = current->next_file;
+            print_list(next, "");
+
+
+        } else {
+            printf("\n");
         }
 
         current = current->next_entrie;
     }
 }
 
-dir_array* read_dir(char* path)
+list_index* read_dir(char* path)
 {
     DIR* dir_handle = opendir(path);
     if (dir_handle == NULL)
@@ -65,7 +72,7 @@ dir_array* read_dir(char* path)
         return NULL;
     }
 
-    dir_array* output = NULL;
+    dir_array* sub_list = NULL;
 
     struct dirent* dir;
     while((dir = readdir(dir_handle)) != NULL)
@@ -75,8 +82,34 @@ dir_array* read_dir(char* path)
             continue;
         }
 
-        output = add_to_list(output, dir);
+        sub_list = add_to_list(sub_list, dir);
+
+
+        if (sub_list->dir->d_type == DT_DIR)
+        {
+            char* subdir = malloc(sizeof(path) + sizeof(sub_list->dir->d_name) + 2);
+            if (subdir == NULL)
+                {   
+                    printf("ERROR: Cannot allocate memory\n");
+                    return NULL;
+                }
+            strcpy(subdir, path);
+            if (subdir[strlen(path) - 1] != '/')
+            {
+                subdir[strlen(path)] = '/';
+            }
+            strcat(subdir, sub_list->dir->d_name);
+
+            sub_list->next_file = read_dir(subdir);
+        }
+
+
     }
+
+    list_index* output = malloc(sizeof(list_index));
+    output->path = &path;
+    output->next_entrie = sub_list;
+
     return output;
 }
 
@@ -108,26 +141,18 @@ int main(int argc, char *argv[])
     }
     */
 
-    dir_array* dir_list = read_dir(path);
+    list_index* dir_list = read_dir(path);
 
-    dir_array* current = dir_list;
+ //   dir_array* current = dir_list;
+
+    /*
     while(current != NULL)
     {
         
-        if (current->dir->d_type == DT_DIR)
-        {
-            char* subdir = malloc(sizeof(path) + sizeof(current->dir->d_name) + 2);
-            strcpy(subdir, path);
-            if (subdir[strlen(path) - 1] != '/')
-            {
-                subdir[strlen(path)] = '/';
-            }
-            strcat(subdir, current->dir->d_name);
 
-            current->next_file = read_dir(subdir);
-        }
         current = current->next_entrie;
     }
+*/
 
     print_list(dir_list, "");
 
