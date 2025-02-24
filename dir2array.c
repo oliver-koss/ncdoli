@@ -17,7 +17,7 @@ typedef struct dir_array_
 } dir_array;
 
 
-dir_array* add_to_array(dir_array* prev, struct dirent* dir)
+dir_array* add_to_list(dir_array* prev, struct dirent* dir)
 {
     dir_array* output = malloc(sizeof(dir_array));
 //    char* name = malloc(sizeof(strlen(dir->d_name)));
@@ -34,13 +34,13 @@ dir_array* add_to_array(dir_array* prev, struct dirent* dir)
 }
 
 
-void print_list(dir_array* input)
+void print_list(dir_array* input, char* prefix)
 {
     dir_array* current = input;
 
     while(current != NULL)
     {
-        printf("%s", current->dir->d_name);
+        printf("%s%s", prefix, current->dir->d_name);
         if (current->dir->d_type == DT_DIR)
         {
             printf("/");
@@ -49,27 +49,35 @@ void print_list(dir_array* input)
 
         if (current->dir->d_type == DT_DIR)
         {
-            printf("\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\n");
-            print_list(current->next_file);
-            printf("----------\n\n");
+            print_list(current->next_file, "---->");
         }
 
         current = current->next_entrie;
     }
 }
 
-dir_array read_dir(char* path)
+dir_array* read_dir(char* path)
 {
     DIR* dir_handle = opendir(path);
     if (dir_handle == NULL)
     {
         printf("Cannot open directory");
-        return 1;
+        return NULL;
     }
 
-    dir_array output = NULL;
+    dir_array* output = NULL;
 
     struct dirent* dir;
+    while((dir = readdir(dir_handle)) != NULL)
+    {
+        if (dir->d_name[1] == '\0' && dir->d_name[0] == '.' || dir->d_name[1] == '.')
+        {
+            continue;
+        }
+
+        output = add_to_list(output, dir);
+    }
+    return output;
 }
 
 int main(int argc, char *argv[])
@@ -92,64 +100,36 @@ int main(int argc, char *argv[])
     dir_array* dir_content = NULL;
 
     struct dirent* dir;
+
+    /*
     while((dir = readdir(d)) != NULL)
     {
-        if (dir->d_name[1] == '\0' && dir->d_name[0] == '.' || dir->d_name[1] == '.')
-        {
-            //printf("continue");
-            continue;
-        }
-        
-        dir_content = add_to_array(dir_content, dir);
-//          dir_array* dir_content = {dir, NULL, dir_content};
-
-
-        if (dir_content->dir->d_type == DT_DIR)
-        {
-            dir_array* buffer_list = NULL;
-
-
-//            char* subdir_path = malloc(sizeof(path) + sizeof(dir_content->dir->d_name) + 2);
-            char subdir_path[strlen(path) + strlen(dir_content->dir->d_name) + 2];
-            strcat(subdir_path, path);
-
-            /*
-            printf("null '%s'\n", subdir_path);
-            if (subdir_path[strlen(path)] != '/')
-            {
-                subdir_path[strlen(path)] = '/';
-            }
-*/
-            strcat(subdir_path, dir_content->dir->d_name);
-
-
-
-
-            //printf("subdir_path: %s\n", subdir_path);
-            //printf("path: %s\n", path);
-
-
-            DIR* subdir = opendir(subdir_path);
-            if (subdir == NULL)
-            {
-                printf("ERROR: Cannot open directory '%s'\n", subdir_path);
-                continue;
-            }
-
-            struct dirent* dir2;
-            while ((dir2 = readdir(subdir)) != NULL)
-            {
-                buffer_list  = add_to_array(buffer_list, dir2);
-                printf("name: %s\n", dir2->d_name);
-            }
-
-            dir_content->next_file = buffer_list;
-        }
-
 
     }
+    */
 
-    print_list(dir_content);
+    dir_array* dir_list = read_dir(path);
+
+    dir_array* current = dir_list;
+    while(current != NULL)
+    {
+        
+        if (current->dir->d_type == DT_DIR)
+        {
+            char* subdir = malloc(sizeof(path) + sizeof(current->dir->d_name) + 2);
+            strcpy(subdir, path);
+            if (subdir[strlen(path) - 1] != '/')
+            {
+                subdir[strlen(path)] = '/';
+            }
+            strcat(subdir, current->dir->d_name);
+
+            current->next_file = read_dir(subdir);
+        }
+        current = current->next_entrie;
+    }
+
+    print_list(dir_list, "");
 
     return 0;
 }
