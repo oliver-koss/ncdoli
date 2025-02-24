@@ -9,21 +9,17 @@
 #define BLUE "\x1b[94m"
 #define MAGENTA "\x1b[35m"
 
-struct dir_array
+typedef struct dir_array_
 {
     struct dirent* dir;
-    struct dir_array* next_file;
-    struct dir_array* next_entrie;
-};
+    struct dir_array_* next_file;
+    struct dir_array_* next_entrie;
+} dir_array;
 
-bool dir_to_array()
+
+dir_array* add_to_array(dir_array* prev, struct dirent* dir)
 {
-
-}
-
-struct dir_array* add_to_array(struct dir_array* prev, struct dirent* dir)
-{
-    struct dir_array* output = malloc(sizeof(struct dir_array));
+    dir_array* output = malloc(sizeof(dir_array));
 //    char* name = malloc(sizeof(strlen(dir->d_name)));
 
 //    strcpy(name, dir->d_name);
@@ -37,17 +33,43 @@ struct dir_array* add_to_array(struct dir_array* prev, struct dirent* dir)
     return output;
 }
 
-void print_list(struct dir_array* input)
-{
-    struct dir_array* current;
 
-    current = input;
+void print_list(dir_array* input)
+{
+    dir_array* current = input;
 
     while(current != NULL)
     {
-        printf("%s\n", current->dir->d_name);
+        printf("%s", current->dir->d_name);
+        if (current->dir->d_type == DT_DIR)
+        {
+            printf("/");
+        }
+        printf("\n");
+
+        if (current->dir->d_type == DT_DIR)
+        {
+            printf("\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\n");
+            print_list(current->next_file);
+            printf("----------\n\n");
+        }
+
         current = current->next_entrie;
     }
+}
+
+dir_array read_dir(char* path)
+{
+    DIR* dir_handle = opendir(path);
+    if (dir_handle == NULL)
+    {
+        printf("Cannot open directory");
+        return 1;
+    }
+
+    dir_array output = NULL;
+
+    struct dirent* dir;
 }
 
 int main(int argc, char *argv[])
@@ -67,22 +89,64 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    struct dir_array* dir_content = NULL;
+    dir_array* dir_content = NULL;
 
     struct dirent* dir;
     while((dir = readdir(d)) != NULL)
     {
-        dir_content = add_to_array(dir_content, dir);
-        /*
-        if (dir->d_type == 8)
+        if (dir->d_name[1] == '\0' && dir->d_name[0] == '.' || dir->d_name[1] == '.')
         {
-            printf(BLUE "%s\n" RESET, dir->d_name);
-        } else if (dir->d_type == 4) {
-            printf(MAGENTA "%s\n" RESET, dir->d_name);
-        } else {
-            printf("%s\n", dir->d_name);
+            //printf("continue");
+            continue;
         }
-        */
+        
+        dir_content = add_to_array(dir_content, dir);
+//          dir_array* dir_content = {dir, NULL, dir_content};
+
+
+        if (dir_content->dir->d_type == DT_DIR)
+        {
+            dir_array* buffer_list = NULL;
+
+
+//            char* subdir_path = malloc(sizeof(path) + sizeof(dir_content->dir->d_name) + 2);
+            char subdir_path[strlen(path) + strlen(dir_content->dir->d_name) + 2];
+            strcat(subdir_path, path);
+
+            /*
+            printf("null '%s'\n", subdir_path);
+            if (subdir_path[strlen(path)] != '/')
+            {
+                subdir_path[strlen(path)] = '/';
+            }
+*/
+            strcat(subdir_path, dir_content->dir->d_name);
+
+
+
+
+            //printf("subdir_path: %s\n", subdir_path);
+            //printf("path: %s\n", path);
+
+
+            DIR* subdir = opendir(subdir_path);
+            if (subdir == NULL)
+            {
+                printf("ERROR: Cannot open directory '%s'\n", subdir_path);
+                continue;
+            }
+
+            struct dirent* dir2;
+            while ((dir2 = readdir(subdir)) != NULL)
+            {
+                buffer_list  = add_to_array(buffer_list, dir2);
+                printf("name: %s\n", dir2->d_name);
+            }
+
+            dir_content->next_file = buffer_list;
+        }
+
+
     }
 
     print_list(dir_content);
