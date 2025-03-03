@@ -8,6 +8,8 @@
 #include <curses.h>
 #include <menu.h>
 
+#include <sys/ioctl.h> // windows size
+
 #define RESET "\x1b[0m"
 #define BLUE "\x1b[94m"
 #define MAGENTA "\x1b[35m"
@@ -25,7 +27,154 @@ typedef struct list_index_
     char path[100];
     int entrie_count;
     dir_array* next_entrie;
+    struct list_index_* prev;
 } list_index;
+
+typedef struct menu_
+{
+    ITEM** item;
+    list_index** files;
+} menu_struct;
+
+menu_struct* menu_from_index(list_index* index)
+{
+    int item_count = index->entrie_count;
+
+    ITEM** item_list = malloc((item_count + 2) * sizeof(ITEM*));
+
+    list_index** dir_list = malloc((item_count + 1) * sizeof(list_index*));
+
+//    for (int i = 0; i<count; i++)
+
+    dir_array* current = index->next_entrie;
+
+    item_list[0] = new_item("..", "");
+    dir_list[0] = index->prev;
+
+    int count = 1;
+    while (current != NULL)
+    {
+        char* name = current->dir->d_name;
+    
+        if (current->dir->d_type == DT_DIR)
+        {
+            item_list[count] = new_item(name, "DIR");
+        } else {
+            item_list[count] = new_item(name, "");
+        }
+
+        dir_list[count] = current->next_file;
+
+        current = current->next_entrie;
+        count++;
+    }
+    item_list[count] = '\0';
+
+//    MENU* menu = new_menu(item_list);
+
+    menu_struct* menu = malloc(sizeof(menu_struct));
+
+    menu->item = item_list;
+    menu->files = dir_list;
+
+    return menu;
+
+}
+
+
+void quit(menu_struct* menu, MENU* me)
+{
+
+  unpost_menu(me);
+  free_menu(me);
+
+  int i = 0;
+  ITEM* current;
+  while((current = menu->item[i]) != '\0')
+  {
+
+    free_item(current);
+    i++;
+  }
+
+  free(menu->item);
+
+  free(menu->files);
+  free(menu);
+
+  //endwin();
+}
+
+
+int menu(list_index* index)
+{
+
+  ITEM **it;
+  MENU *me;
+
+  menu_struct* menu;
+
+  initscr();
+//  atexit(quit(menu, me));
+  clear();
+  noecho();
+  curs_set(0);
+  cbreak();
+  nl();
+  keypad(stdscr, TRUE);
+
+  /*
+  it = (ITEM **)calloc(5, sizeof(ITEM *));
+  it[0] = new_item("M1", "");
+  it[1] = new_item("M2", "");
+  it[2] = new_item("M3", "");
+  it[3] = new_item("Ende", "");
+  it[4] = '\0';
+  me = new_menu(it);
+  */
+
+
+  menu = menu_from_index(index);
+
+  me = new_menu(menu->item);
+
+  post_menu(me);	
+
+//  mvaddstr(7, 3, "Programm mittels Menü oder F1-Funktionstaste beenden");
+  refresh();
+
+  int ch;
+  while((ch=getch()) != KEY_F(1))
+  {
+    switch(ch)
+    {
+      case KEY_DOWN:
+        menu_driver(me, REQ_DOWN_ITEM);
+        break;
+      case KEY_UP:
+        menu_driver(me, REQ_UP_ITEM);
+        break;
+      case 0xA: /* Return- bzw. Enter-Taste -> ASCII-Code */
+        if (menu->files[item_index(current_item(me))] != NULL)
+        {
+            list_index* subdir = menu->files[item_index(current_item(me))];
+            unpost_menu(me);
+            quit(menu, me);
+
+            menu = menu_from_index(subdir);
+            me = new_menu(menu->item);
+
+            post_menu(me);
+
+            refresh();
+            
+            break;
+        }  
+      // item_index(current_item(me))	
+    }
+  } 
+  return (0);  
+}
 
 void free_list(list_index* input)
 {
@@ -69,6 +218,7 @@ void print_list(list_index* input)
 //    printf("Debugg1: %p\n", input->path);
 
     printf(RED "DEBUGG: %s: %i entries\n" RESET, input->path, input->entrie_count);
+    printf(BLUE "Previous: %s\n" RESET, input->prev->path);
 
     while(current != NULL)
     {
@@ -102,6 +252,16 @@ list_index* read_dir(char* path)
 
     int entrie_count = 0;
     struct dirent* dir;
+
+
+
+    list_index* output = malloc(sizeof(list_index));
+    if (output == NULL)
+    {
+        return NULL;
+    }
+
+
     while((dir = readdir(dir_handle)) != NULL)
     {
         if (dir->d_name[1] == '\0' && dir->d_name[0] == '.' || dir->d_name[1] == '.')
@@ -133,7 +293,8 @@ list_index* read_dir(char* path)
             strcat(subdir, sub_list->dir->d_name);
 
             sub_list->next_file = read_dir(subdir);
-
+            sub_list->next_file->prev = output; // TODO
+            
             
         }
 
@@ -142,11 +303,7 @@ list_index* read_dir(char* path)
     }
 
 
-    list_index* output = malloc(sizeof(list_index));
-    if (output == NULL)
-    {
-        return NULL;
-    }
+
 
 //    printf("Path: %s\n", path);
     strcpy(output->path, path);
@@ -167,7 +324,12 @@ int print_menu(list_index* dir_list)
     noecho();
     keypad(stdscr, TRUE);
 
+    int entrie_count = dir_list->entrie_count;
 
+    for (int i = 0; i < n_choices; i++)
+    {
+
+    }
 }
 */
 
@@ -184,10 +346,16 @@ int main(int argc, char *argv[])
         path = ".";
     }
 
+//    struct winsize w;
+//    ioctl(0, TIOCGWINSZ, &w);
 
+//    printf("windows size: %ix%i\n", w.ws_xpixel, w.ws_ypixel);
 
     list_index* dir_list = read_dir(path);
-    print_list(dir_list);
+//    print_list(dir_list);
+
+    menu(dir_list);
+
     free_list(dir_list);
 
 
