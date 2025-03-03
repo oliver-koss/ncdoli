@@ -58,6 +58,7 @@ menu_struct* menu_from_index(list_index* index)
     
         if (current->dir->d_type == DT_DIR)
         {
+
             item_list[count] = new_item(name, "DIR");
         } else {
             item_list[count] = new_item(name, "");
@@ -101,10 +102,17 @@ void quit(menu_struct* menu, MENU* me)
 
   free(menu->files);
   free(menu);
-
-  //endwin();
 }
 
+void screen_print()
+{
+    int row,col;
+
+    getmaxyx(stdscr,row,col);
+
+    mvprintw(row-3, 0, "ncdoli - lollololol");
+    mvprintw(row-2,0,"This screen has %d rows and %d columns\n",row,col);
+}
 
 int menu(list_index* index)
 {
@@ -116,22 +124,13 @@ int menu(list_index* index)
 
   initscr();
 //  atexit(quit(menu, me));
+
   clear();
   noecho();
   curs_set(0);
   cbreak();
   nl();
   keypad(stdscr, TRUE);
-
-  /*
-  it = (ITEM **)calloc(5, sizeof(ITEM *));
-  it[0] = new_item("M1", "");
-  it[1] = new_item("M2", "");
-  it[2] = new_item("M3", "");
-  it[3] = new_item("Ende", "");
-  it[4] = '\0';
-  me = new_menu(it);
-  */
 
 
   menu = menu_from_index(index);
@@ -140,7 +139,8 @@ int menu(list_index* index)
 
   post_menu(me);	
 
-//  mvaddstr(7, 3, "Programm mittels Menü oder F1-Funktionstaste beenden");
+  screen_print();
+
   refresh();
 
   int ch;
@@ -166,11 +166,12 @@ int menu(list_index* index)
 
             post_menu(me);
 
+            screen_print();
+
             refresh();
             
             break;
-        }  
-      // item_index(current_item(me))	
+        }
     }
   } 
   return (0);  
@@ -214,8 +215,6 @@ dir_array* add_to_list(dir_array* prev, struct dirent* dir)
 void print_list(list_index* input)
 {
     dir_array* current = input->next_entrie;
-
-//    printf("Debugg1: %p\n", input->path);
 
     printf(RED "DEBUGG: %s: %i entries\n" RESET, input->path, input->entrie_count);
     printf(BLUE "Previous: %s\n" RESET, input->prev->path);
@@ -315,23 +314,6 @@ list_index* read_dir(char* path)
     return output;
 }
 
-/*
-int print_menu(list_index* dir_list)
-{
-
-    initscr();
-    cbreak();
-    noecho();
-    keypad(stdscr, TRUE);
-
-    int entrie_count = dir_list->entrie_count;
-
-    for (int i = 0; i < n_choices; i++)
-    {
-
-    }
-}
-*/
 
 int main(int argc, char *argv[])
 {
